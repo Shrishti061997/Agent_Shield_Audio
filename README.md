@@ -136,14 +136,14 @@ curl -s http://localhost:8765/v1/quote
 
 **Without payment → 402:**
 ```bash
-curl -s -o - -w "\nHTTP %{http_code}\n" -X POST http://localhost:8000/v1/transcribe \
+curl -s -o - -w "\nHTTP %{http_code}\n" -X POST http://localhost:8765/v1/transcribe \
   -H 'Content-Type: application/json' \
   -d '{"url":"https://download.samplelib.com/mp3/sample-12s.mp3"}'
 ```
 
 **With payment proof → transcript + injection verdict:**
 ```bash
-curl -s -X POST http://localhost:8000/v1/transcribe \
+curl -s -X POST http://localhost:8765/v1/transcribe \
   -H 'Content-Type: application/json' \
   -H 'X-PAYMENT: demo-payment-proof-0123456789abcdef' \
   -d '{"url":"https://...mp3","translate":true,"detect_injection":true}'
