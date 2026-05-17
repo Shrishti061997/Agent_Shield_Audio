@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent Shield Audio — v1</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+         background: #0b0c10; color: #e6e6e6; margin: 0; padding: 2rem;
+         max-width: 1000px; margin-inline: auto; }
+  h1 { font-size: 1.6rem; margin: 0 0 .25rem; }
+  .tag { color: #8fb4ff; font-size: .9rem; margin: 0 0 1.5rem; }
+  .card { background: #14161c; border: 1px solid #232735; border-radius: 8px;
+          padding: 1.25rem; margin-bottom: 1rem; }
+  label { display: block; font-size: .85rem; color: #aaa; margin-bottom: .35rem; }
+  input[type=text] { width: 100%; padding: .65rem .8rem; background: #0b0c10;
+                     color: #e6e6e6; border: 1px solid #2a2f40; border-radius: 6px;
+                     font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9rem; }
+  .row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-top: .75rem; }
+  .row label { display: flex; align-items: center; gap: .4rem; margin: 0; font-size: .9rem; color: #ccc; }
+  button { background: #3b82f6; color: white; border: 0; padding: .7rem 1.2rem;
+           border-radius: 6px; cursor: pointer; font-weight: 600; font-size: .95rem; }
+  button:disabled { background: #2a3142; cursor: not-allowed; }
+  pre { background: #0b0c10; border: 1px solid #232735; padding: 1rem; border-radius: 6px;
+        overflow-x: auto; font-size: .82rem; max-height: 60vh; }
+  .badge { display: inline-block; padding: .15rem .5rem; border-radius: 4px;
+           font-size: .75rem; font-weight: 600; letter-spacing: .03em; }
+  .ok { background: #14342a; color: #5eead4; }
+  .bad { background: #3a1518; color: #fca5a5; }
+  .examples { font-size: .85rem; color: #888; }
+  .examples a { color: #8fb4ff; text-decoration: none; cursor: pointer; }
+  .examples a:hover { text-decoration: underline; }
+  code { background: #1a1d27; padding: .1rem .35rem; border-radius: 3px;
+         font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  .transcript { white-space: pre-wrap; line-height: 1.55; font-size: .95rem; color: #e6e6e6; }
+  .seg { padding: .05rem .1rem; border-radius: 3px; }
+  .seg-flagged { background: rgba(252, 165, 165, .18); border-bottom: 1px dashed #fca5a5; }
+  .seg-ts { color: #5a6478; font-size: .72rem; margin-right: .35rem; user-select: none; }
+  .translation { color: #b6d4ff; font-style: italic; border-top: 1px solid #232735;
+                 padding-top: .75rem; margin-top: .75rem; }
+  .placeholder { color: #6a7280; font-style: italic; }
+</style>
+</head>
+<body>
+  <h1>Agent Shield Audio</h1>
+  <p class="tag">Multilingual transcription + English translation + voice-prompt-injection detection. Payable per call via x402.</p>
+
+  <div class="card">
+    <label for="url">Audio / video URL</label>
+    <input id="url" type="text" placeholder="https://www.youtube.com/watch?v=... or https://.../podcast.mp3">
+
+    <div class="row">
+      <label><input id="translate" type="checkbox"> Translate to English</label>
+      <label><input id="detect" type="checkbox" checked> Detect prompt-injection</label>
+      <button id="go">Run</button>
+      <span id="status" style="color:#888; font-size:.85rem;"></span>
+    </div>
+
+    <div class="examples" style="margin-top: 1rem;">
+      Try:
+      <a data-url="http://127.0.0.1:9000/clean.mp3">clean speech</a> ·
+      <a data-url="http://127.0.0.1:9000/injection.mp3">planted voice injection</a> ·
+      <a data-url="http://127.0.0.1:9000/spanish.mp3">Spanish (set ✓ Translate)</a>
+      <div style="margin-top:.4rem;font-size:.78rem;color:#6a7280;">
+        Direct audio URLs (mp3/wav/m4a) and yt-dlp-supported sites work.
+        YouTube requires <code>YT_COOKIES_FILE</code> on servers that hit YouTube's bot wall.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>Verdict</label>
+    <div id="verdict">Run a request to see the result.</div>
+  </div>
+
+  <div class="card">
+    <label>Transcript</label>
+    <div id="transcript" class="transcript"><span class="placeholder">Transcribed text will appear here. Segments containing injection signals are highlighted.</span></div>
+  </div>
+
+  <div class="card">
+    <label>Raw JSON response</label>
+    <pre id="out">{}</pre>
+  </div>
+
+  <div class="card">
+    <label>curl (agent-style)</label>
+<pre>curl -X POST http://localhost:8765/v1/transcribe \
+  -H 'Content-Type: application/json' \
+  -H 'X-PAYMENT: demo-payment-proof-0123456789abcdef' \
+  -d '{"url": "https://download.samplelib.com/mp3/sample-12s.mp3", "translate": true, "detect_injection": true}'</pre>
+    <p style="color:#888; font-size:.85rem;">
+      Without <code>X-PAYMENT</code>, the endpoint returns <code>402 Payment Required</code> with USDC payment instructions per the x402 spec.
+    </p>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+document.querySelectorAll('.examples a').forEach(a => {
+  a.addEventListener('click', () => { $('url').value = a.dataset.url; });
+});
+
+const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g,
+  c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
+
+function renderTranscript(data) {
+  const segs = Array.isArray(data.segments) ? data.segments : [];
+  let html = '';
+  if (segs.length) {
+    html = segs.map(s => {
+      const cls = s.injection_flagged ? 'seg seg-flagged' : 'seg';
+      const title = `score: ${s.injection_score ?? 0}`;
+      const ts = `[${(s.start ?? 0).toFixed(1)}-${(s.end ?? 0).toFixed(1)}s]`;
+      return `<span class="${cls}" title="${title}"><span class="seg-ts">${ts}</span>${escapeHtml(s.text)}</span>`;
+    }).join(' ');
+  } else if (data.text) {
+    html = escapeHtml(data.text);
+  } else {
+    html = '<span class="placeholder">(empty transcript — audio may have been silence or VAD-suppressed)</span>';
+  }
+  if (data.translation_en) {
+    html += `<div class="translation"><strong>EN translation:</strong> ${escapeHtml(data.translation_en)}</div>`;
+  }
+  $('transcript').innerHTML = html;
+}
+
+$('go').addEventListener('click', async () => {
+  const url = $('url').value.trim();
+  if (!url) { $('status').textContent = 'enter a URL first'; return; }
+
+  $('go').disabled = true;
+  $('status').textContent = 'transcribing…';
+  $('verdict').textContent = '…';
+  $('transcript').innerHTML = '<span class="placeholder">…</span>';
+  $('out').textContent = '{}';
+
+  const body = {
+    url: url,
+    translate: $('translate').checked,
+    detect_injection: $('detect').checked,
+  };
+
+  try {
+    const r = await fetch('/v1/transcribe', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-PAYMENT': 'demo-payment-proof-0123456789abcdef',
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    $('out').textContent = JSON.stringify(data, null, 2);
+
+    if (r.status === 402) {
+      $('verdict').innerHTML = '<span class="badge bad">402 PAYMENT REQUIRED</span> Include X-PAYMENT header.';
+      $('transcript').innerHTML = '<span class="placeholder">No transcript — payment required.</span>';
+    } else if (r.ok) {
+      const badge = data.injection_detected
+        ? '<span class="badge bad">INJECTION DETECTED</span>'
+        : '<span class="badge ok">CLEAN</span>';
+      const lang = data.language_detected ? ` · lang: <code>${data.language_detected}</code>` : '';
+      const dur = data.duration_seconds ? ` · ${data.duration_seconds}s audio` : '';
+      const lat = data.pipeline_latency_seconds ? ` · ${data.pipeline_latency_seconds}s pipeline` : '';
+      $('verdict').innerHTML = `${badge}${lang}${dur}${lat}<br><span style="color:#aaa;font-size:.85rem">${data.injection_reason || ''}</span>`;
+      renderTranscript(data);
+    } else {
+      $('verdict').innerHTML = `<span class="badge bad">ERROR ${r.status}</span> ${data.detail || ''}`;
+      $('transcript').innerHTML = '<span class="placeholder">No transcript — request failed.</span>';
+    }
+  } catch (e) {
+    $('verdict').innerHTML = `<span class="badge bad">NETWORK ERROR</span> ${e.message}`;
+  } finally {
+    $('go').disabled = false;
+    $('status').textContent = '';
+  }
+});
+</script>
+</body>
+</html>

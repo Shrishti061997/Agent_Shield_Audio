@@ -1,0 +1,15 @@
+# CPU-only install profile.
+#
+# Pulls torch (CPU build) from pytorch.org's CPU wheel index, then
+# everything else from PyPI.  Saves ~3GB vs the default CUDA wheels and
+# makes server.py run on any laptop without a GPU.
+#
+# Usage:   pip install -r requirements-cpu.txt
+# Then:    WHISPER_MODEL=small python server.py    (small/base/tiny on CPU)
+
+--index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://pypi.org/simple
+
+torch==2.5.1
+
+-r requirements.txt
