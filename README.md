@@ -131,7 +131,7 @@ Demo UI at `http://localhost:8765/`.
 
 **Get a price quote (no payment needed):**
 ```bash
-curl -s http://localhost:8000/v1/quote
+curl -s http://localhost:8765/v1/quote
 ```
 
 **Without payment → 402:**
